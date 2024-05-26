@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define HASHSIZE 100
+#define HASHSIZE 1171 // 1171は素数
 struct cell {
   char *p_code; // 郵便番号
   char *address; // 住所
@@ -150,7 +150,10 @@ int main(void){
   // }
 
   // 検索するファイルを読み込み
-  const char *textfile = "input1000.txt";
+  // const char *textfile = "input1000.txt";
+  // const char *textfile = "input10000.txt";
+  const char *textfile = "input100000.txt";
+
   char buffer[1024];
   fp = fopen(textfile, "r");
   if(fp == NULL){
