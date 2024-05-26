@@ -3,10 +3,6 @@
 #include <string.h>
 
 #define HASHSIZE 100
-#define SEARCHED_TEXT1 "input1000.txt"
-#define SEARCHED_TEXT2 "input10000.txt"
-#define SEARCHED_TEXT3 "input100000.txt"
-
 struct cell {
   char *p_code; // 郵便番号
   char *address; // 住所
@@ -14,10 +10,10 @@ struct cell {
   struct cell *a_next; // 次の住所のセルへのポインタ
 };
 
-// key: 郵便番号, value: 住所のハッシュテーブル
+// index: hash(郵便番号), value: cell 住所のハッシュテーブル
 struct cell *p_table[HASHSIZE];
 
-// key: 住所, value: 郵便番号のハッシュテーブル
+// index: hash(住所), value: cell 郵便番号のハッシュテーブル
 struct cell *a_table[HASHSIZE];
 
 // ハッシュ関数（utf-8）
@@ -41,8 +37,8 @@ struct cell *new_cell(char *p_code, char *address){
     perror("Error: malloc\n");
     exit(1);
   }
-  p->p_code = p_code;
-  p->address = address;
+  p->p_code = strdup(p_code); // strdup関数を使って新たにメモリを確保し、内容をコピー
+  p->address = strdup(address); // strdup関数を使って新たにメモリを確保し、内容をコピー
   p->p_next = NULL;
   p->a_next = NULL;
   return p;
@@ -64,7 +60,7 @@ void hash_info(){
     // printf("p_codetable[%d]: %d\n", i, length);
     sum_p += length;
   }
-  printf("p_codetable: %d\n", sum_p);
+  // printf("p_codetable: %d\n", sum_p);
 
   for(i=0; i<HASHSIZE; i++){
     length = 0;
@@ -76,7 +72,7 @@ void hash_info(){
     // printf("a_codetable[%d]: %d\n", i, length);
     sum_a += length;
   }
-  printf("a_codetable: %d\n", sum_a);
+  // printf("a_codetable: %d\n", sum_a);
   
 }
 
@@ -147,8 +143,39 @@ int main(void){
 
   // hash_info();
 
-  struct cell *p = p_table[0];
-  printf("%s %s\n", p->p_code, p->p_next->p_code);
+  // struct cell *p = p_table[0];
+  // while(p != NULL){
+  //   printf("%s %s\n", p->p_code, p->address);
+  //   p = p->p_next;
+  // }
+
+  // 検索するファイルを読み込み
+  const char *textfile = "input1000.txt";
+  char buffer[1024];
+  fp = fopen(textfile, "r");
+  if(fp == NULL){
+    printf("Error: %sファイルがありません\n", textfile);
+    return 1;
+  }
+  while (fscanf(fp, "%s", buffer) != EOF) {
+    // printf("%s\n", buffer);
+    if(buffer[0] >= '0' && buffer[0] <= '9'){
+      struct cell *p = search_p_code(buffer);
+      if(p != NULL){
+        printf("Code to Address : %s %s\n", buffer, p->address);
+      }else{
+        printf("Not Found\n");
+      }
+    }else{
+      struct cell *p = search_address(buffer);
+      if(p != NULL){
+        printf("Address to Code : %s %s\n", p->p_code, buffer);
+      }else{
+        printf("%s is Not Found\n" , buffer);
+      }
+    }
+  }
+  fclose(fp);
 
   return 0;
 }
