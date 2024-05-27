@@ -1,8 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
-#define HASHSIZE 1171 // 1171は素数
+#define HASHSIZE 1171
 struct cell {
   char *p_code; // 郵便番号
   char *address; // 住所
@@ -160,6 +161,12 @@ int main(void){
     printf("Error: %sファイルがありません\n", textfile);
     return 1;
   }
+
+  // 計測開始
+  clock_t start, end;
+  double cpu_time_used;
+
+  start = clock();
   while (fscanf(fp, "%s", buffer) != EOF) {
     // printf("%s\n", buffer);
     if(buffer[0] >= '0' && buffer[0] <= '9'){
@@ -178,7 +185,12 @@ int main(void){
       }
     }
   }
+  end = clock();
+
   fclose(fp);
+
+  cpu_time_used = ((double)(end - start)) / CLOCKS_PER_SEC;
+  printf("Time: %f\n", cpu_time_used);
 
   return 0;
 }
