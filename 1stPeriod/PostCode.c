@@ -18,17 +18,12 @@ struct cell *p_table[HASHSIZE];
 struct cell *a_table[HASHSIZE];
 
 // ハッシュ関数（utf-8）
-unsigned int hash(const char *str) {
-  unsigned int hashval = 0;
-  unsigned char *p = (unsigned char *)str;
-
-  while (*p != '\0') {
-    hashval = *p + 31 * hashval;
-    p++;
+int hash(char *str){
+  unsigned int hash = 0;
+  while(*str){
+    hash = (hash << 5) - hash + *str++;
   }
-  unsigned int result = hashval % HASHSIZE;
-  // printf("%s: %d\n", str, result);
-  return result;
+  return hash % HASHSIZE;
 }
 
 // ハッシュテーブルにデータを追加する関数
@@ -124,20 +119,20 @@ int main(void){
     int a_index = hash(AddressBuffer);
 
     // 郵便番号-住所対応表
-    if(p_table[p_index] == NULL){
-      p_table[p_index] = p;
-    }else{
+    // if(p_table[p_index] == NULL){
+    //   p_table[p_index] = p;
+    // }else{
       p->p_next = p_table[p_index];
       p_table[p_index] = p;
-    }
+    // }
 
     // 住所-郵便番号対応表
-    if(a_table[a_index] == NULL){
-      a_table[a_index] = p;
-    }else{
+    // if(a_table[a_index] == NULL){
+    //   a_table[a_index] = p;
+    // }else{
       p->a_next = a_table[a_index];
       a_table[a_index] = p;
-    }
+    // }
 
   }
   fclose(fp);
@@ -151,9 +146,9 @@ int main(void){
   // }
 
   // 検索するファイルを読み込み
-  // const char *textfile = "input1000.txt";
+  const char *textfile = "input1000.txt";
   // const char *textfile = "input10000.txt";
-  const char *textfile = "input100000.txt";
+  // const char *textfile = "input100000.txt";
 
   char buffer[1024];
   fp = fopen(textfile, "r");
