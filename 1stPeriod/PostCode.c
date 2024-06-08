@@ -2,8 +2,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <math.h>
 
-#define HASHSIZE 1171
+#define HASHSIZE 997
 struct cell {
   char *p_code; // 郵便番号
   char *address; // 住所
@@ -40,10 +41,24 @@ struct cell *new_cell(char *p_code, char *address){
   return p;
 }
 
+double sqrt_newton(double x) {
+    // 初期推定値として x/2 を使用
+    double guess = x / 2.0;
+
+    // 収束条件: 推定値の2乗と目標値の差が十分に小さい
+    while (fabs(guess * guess - x) > 0.00001) {
+        // ニュートン法の更新式
+        guess = (guess + x / guess) / 2.0;
+    }
+
+    return guess;
+}
+
 // ハッシュテーブルの情報を表示
 void hash_info(){
   int sum_p = 0, sum_a = 0;
   int i, length;
+  int NumOfElements_a[HASHSIZE], NumOfElements_p[HASHSIZE];
   struct cell *p;
 
   for(i=0; i<HASHSIZE; i++){
@@ -53,10 +68,9 @@ void hash_info(){
       length++;
       p = p->p_next;
     }
-    // printf("p_codetable[%d]: %d\n", i, length);
+    NumOfElements_p[i] = length;
     sum_p += length;
   }
-  // printf("p_codetable: %d\n", sum_p);
 
   for(i=0; i<HASHSIZE; i++){
     length = 0;
@@ -65,11 +79,43 @@ void hash_info(){
       length++;
       p = p->a_next;
     }
-    // printf("a_codetable[%d]: %d\n", i, length);
+    NumOfElements_a[i] = length;
     sum_a += length;
   }
-  // printf("a_codetable: %d\n", sum_a);
-  
+
+  // ハッシュテーブルの要素数の平均、最小、最大、分散、標準偏差を求める
+  double ave_p = (double)sum_p / HASHSIZE;
+  double ave_a = (double)sum_a / HASHSIZE;
+  double var_p = 0, var_a = 0;
+  double std_p, std_a;
+  int min_p = NumOfElements_p[0], max_p = NumOfElements_p[0];
+  int min_a = NumOfElements_a[0], max_a = NumOfElements_a[0];
+  for(i=0; i<HASHSIZE; i++){
+    var_p += (NumOfElements_p[i] - ave_p) * (NumOfElements_p[i] - ave_p);
+    var_a += (NumOfElements_a[i] - ave_a) * (NumOfElements_a[i] - ave_a);
+    if(NumOfElements_p[i] < min_p){
+      min_p = NumOfElements_p[i];
+    }
+    if(NumOfElements_p[i] > max_p){
+      max_p = NumOfElements_p[i];
+    }
+    if(NumOfElements_a[i] < min_a){
+      min_a = NumOfElements_a[i];
+    }
+    if(NumOfElements_a[i] > max_a){
+      max_a = NumOfElements_a[i];
+    }
+  }
+  var_p /= HASHSIZE;
+  var_a /= HASHSIZE;
+  std_p = sqrt_newton(var_p);
+  std_a = sqrt_newton(var_a);
+
+  printf("HASHSIZE: %d\n", HASHSIZE);
+  printf("p_codetable: %d\n", sum_p);
+  printf("a_codetable: %d\n", sum_a);
+  printf("p_codetable: ave=%f, min=%d, max=%d, var=%f, std=%f\n", ave_p, min_p, max_p, var_p, std_p);
+  printf("a_codetable: ave=%f, min=%d, max=%d, var=%f, std=%f\n", ave_a, min_a, max_a, var_a, std_a);
 }
 
 // 郵便番号をテーブルから検索し、見つかった場合はそのセルへのポインタを返す
@@ -119,38 +165,26 @@ int main(void){
     int a_index = hash(AddressBuffer);
 
     // 郵便番号-住所対応表
-    // if(p_table[p_index] == NULL){
-    //   p_table[p_index] = p;
-    // }else{
-      p->p_next = p_table[p_index];
-      p_table[p_index] = p;
-    // }
+    p->p_next = p_table[p_index];
+    p_table[p_index] = p;
 
     // 住所-郵便番号対応表
-    // if(a_table[a_index] == NULL){
-    //   a_table[a_index] = p;
-    // }else{
-      p->a_next = a_table[a_index];
-      a_table[a_index] = p;
-    // }
+    p->a_next = a_table[a_index];
+    a_table[a_index] = p;
 
   }
   fclose(fp);
 
-  // hash_info();
-
-  // struct cell *p = p_table[0];
-  // while(p != NULL){
-  //   printf("%s %s\n", p->p_code, p->address);
-  //   p = p->p_next;
-  // }
+  hash_info();
 
   // 検索するファイルを読み込み
   const char *textfile = "input1000.txt";
   // const char *textfile = "input10000.txt";
   // const char *textfile = "input100000.txt";
 
-  char buffer[1024];
+// カレントディレクトリにinputファイルがあれば計測を行う
+if((fp = fopen(textfile, "r")) != NULL){
+      char buffer[1024];
   fp = fopen(textfile, "r");
   if(fp == NULL){
     printf("Error: %sファイルがありません\n", textfile);
@@ -184,8 +218,34 @@ int main(void){
 
   fclose(fp);
 
+  // 計測終了
   cpu_time_used = ((double)(end - start)) / CLOCKS_PER_SEC;
   printf("Time: %f\n", cpu_time_used);
+  }
+
+  // 標準入力から検索
+  char input[1024];
+  printf("Input 'exit' to finish\n");
+  while(1){
+    printf("Input: ");
+    if(scanf("%s", input) == EOF){break;}
+    if(strcmp(input, "exit") == 0){break;}
+    if(input[0] >= '0' && input[0] <= '9'){
+      struct cell *p = search_p_code(input);
+      if(p != NULL){
+        printf("Code to Address : %s %s\n", input, p->address);
+      }else{
+        printf("Not Found\n");
+      }
+    }else{
+      struct cell *p = search_address(input);
+      if(p != NULL){
+        printf("Address to Code : %s %s\n", p->p_code, input);
+      }else{
+        printf("%s is Not Found\n" , input);
+      }
+    }
+  }
 
   return 0;
 }
