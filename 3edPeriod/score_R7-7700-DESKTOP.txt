@@ -1,9 +1,0 @@
-WHITE,0,2
-MonteAI_753,1,0
-BLACK,0,5
-MonteAI_464,1,0
-MonteAI_168,1,0
-MonteAI_822,1,0
-MonteAI_647,1,0
-MonteAI_567,1,0
-MonteAI_579,1,0

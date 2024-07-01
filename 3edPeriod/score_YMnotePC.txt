@@ -1,4 +1,0 @@
-RandomAI_750,0,1
-WHITE,1,0
-BLACK,1,0
-RandomAI_876,0,1

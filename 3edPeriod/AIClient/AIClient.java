@@ -134,86 +134,94 @@ public class AIClient {
   }
 
 // 石が置けるかどうかを判定する関数
-private boolean isValidMove(int[][] board, int x, int y, int color) {
-  // すでに石が置かれている場所には置けない
-  if (board[x][y] != 0) {
+  private boolean isValidMove(int[][] board, int x, int y, int color) {
+    // すでに石が置かれている場所には置けない
+    if (board[x][y] != 0) {
+      return false;
+    }
+
+    int opponent = -color;
+
+    // 8方向をチェック
+    int[][] directions = {{-1,-1}, {-1,0}, {-1,1}, {0,-1}, {0,1}, {1,-1}, {1,0}, {1,1}};
+    
+    for (int[] dir : directions) {
+      int dx = dir[0];
+      int dy = dir[1];
+      int nx = x + dx;
+      int ny = y + dy;
+      
+      // 隣が相手の石かチェック
+      if (nx >= 0 && nx < 8 && ny >= 0 && ny < 8 && board[nx][ny] == opponent) {
+        nx += dx;
+        ny += dy;
+        // その方向にさらに進む
+        while (nx >= 0 && nx < 8 && ny >= 0 && ny < 8) {
+          if (board[nx][ny] == color) {
+            // 自分の石で挟めていればtrue
+            return true;
+          } else if (board[nx][ny] == 0) {
+            // 空白マスに到達したらこの方向は無効
+            break;
+          }
+          nx += dx;
+          ny += dy;
+        }
+      }
+    }
+    
+    // どの方向でも挟めなかった
     return false;
   }
 
-  int opponent = -color;
-
-  // 8方向をチェック
-  int[][] directions = {{-1,-1}, {-1,0}, {-1,1}, {0,-1}, {0,1}, {1,-1}, {1,0}, {1,1}};
-  
-  for (int[] dir : directions) {
-    int dx = dir[0];
-    int dy = dir[1];
-    int nx = x + dx;
-    int ny = y + dy;
+  // 全マスをチェックして置ける場所を二次元配列で返す関数
+  private int[][] getValidMoves(int[][] board, int color) {
+    int[][] validMoves = new int[8][8];
     
-    // 隣が相手の石かチェック
-    if (nx >= 0 && nx < 8 && ny >= 0 && ny < 8 && board[nx][ny] == opponent) {
-      nx += dx;
-      ny += dy;
-      // その方向にさらに進む
-      while (nx >= 0 && nx < 8 && ny >= 0 && ny < 8) {
-        if (board[nx][ny] == color) {
-          // 自分の石で挟めていればtrue
-          return true;
-        } else if (board[nx][ny] == 0) {
-          // 空白マスに到達したらこの方向は無効
-          break;
+    for (int i = 0; i < 8; i++) {
+      for (int j = 0; j < 8; j++) {
+        if (isValidMove(board, i, j, color)) {
+          validMoves[i][j] = 1;
         }
-        nx += dx;
-        ny += dy;
       }
     }
+    
+    return validMoves;
   }
-  
-  // どの方向でも挟めなかった
-  return false;
-}
 
 // とりあえずランダムに石を置く関数
-private int[] randomPut(int[][] board, int color) {
-  ArrayList<int[]> validMoves = new ArrayList<>();
-  int[][] debugBoard = new int[8][8];
-  
-  // 全マスをチェックして有効な手を列挙
-  for (int i = 0; i < 8; i++) {
-    for (int j = 0; j < 8; j++) {
-      if (isValidMove(board, i, j, color)) {
-        validMoves.add(new int[]{i, j});
-        debugBoard[i][j] = 1; // デバッグ用に置ける位置を1で表示
+  private int[] randomPut(int[][] board, int color) {
+    int[][] validMoves = getValidMoves(board, color);
+    ArrayList<int[]> movesList = new ArrayList<>();
+    
+    // デバッグ用の表示と有効な手のリスト作成
+    System.out.println("置ける位置:");
+    for (int i = 0; i < 8; i++) {
+      for (int j = 0; j < 8; j++) {
+        System.out.print(validMoves[i][j] + " ");
+        if (validMoves[i][j] == 1) {
+          movesList.add(new int[]{i, j});
+        }
       }
-    }
-  }
-  
-  // デバッグ用の表示
-  System.out.println("置ける位置:");
-  for (int i = 0; i < 8; i++) {
-    for (int j = 0; j < 8; j++) {
-      System.out.print(debugBoard[i][j] + " ");
+      System.out.println();
     }
     System.out.println();
+    
+    // 有効な手がない場合
+    if (movesList.isEmpty()) {
+      System.out.println("置ける位置がありません。");
+      return null;
+    }
+    
+    // ランダムに選択
+    Random random = new Random();
+    int randomIndex = random.nextInt(movesList.size());
+    int[] selectedMove = movesList.get(randomIndex);
+    
+    System.out.println("選択された位置: (" + selectedMove[0] + ", " + selectedMove[1] + ")");
+    
+    return selectedMove;
   }
-  System.out.println();
-  
-  // 有効な手がない場合
-  if (validMoves.isEmpty()) {
-    System.out.println("置ける位置がありません。");
-    return null;
-  }
-  
-  // ランダムに選択
-  Random random = new Random();
-  int randomIndex = random.nextInt(validMoves.size());
-  int[] selectedMove = validMoves.get(randomIndex);
-  
-  System.out.println("選択された位置: (" + selectedMove[0] + ", " + selectedMove[1] + ")");
-  
-  return selectedMove;
-}
 
   public static void main(String args[]) {
     if (args.length != 2) {
