@@ -9,3 +9,5 @@ plotly
 nbformat
 scikit-learn
 markupsafe
+tensorflow
+keras
