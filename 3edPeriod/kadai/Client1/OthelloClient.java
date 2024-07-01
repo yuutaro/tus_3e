@@ -1,4 +1,4 @@
-package kadai;
+package kadai.Client1;
 
 import java.awt.*;
 import java.awt.event.*;

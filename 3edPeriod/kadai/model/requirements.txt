@@ -1,0 +1,11 @@
+numpy
+scipy
+pandas
+requests
+requests-oauthlib
+matplotlib
+seaborn
+plotly
+nbformat
+scikit-learn
+markupsafe
