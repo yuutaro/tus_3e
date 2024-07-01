@@ -1,73 +1,130 @@
 #include <iostream>
-#include <vector>
+#include <unordered_map>
 #include <string>
 
-template<typename T>
-class HashTable {
-private:
-  static const int SIZE = 100;
-  std::vector<std::pair<std::string, T>> table[SIZE];
+#define HASHSIZE 101
 
-  // ハッシュ関数
-  int hash(const std::string& key) {
-    int hash = 0;
-    for (char c : key) {
-      hash += c;
+using namespace std;
+
+struct MyHash
+{
+  std::size_t operator()(const std::string &key) const
+  {
+    unsigned int hash = 0;
+    for (char c : key)
+    {
+      hash = (hash << 5) - hash + c;
     }
-    return hash % SIZE;
-  }
-
-public:
-  // コンストラクタ
-  HashTable() {}
-
-  // キーによる探索
-  T operator()(const std::string& key) {
-    int index = hash(key);
-    for (const auto& item : table[index]) {
-      if (item.first == key) {
-        return item.second;
-      }
-    }
-      // キーが見つからない場合はデフォルト値を返す
-    return T();
-  }
-
-  // アイテムの挿入
-  void insert(const std::string& key, const T& value) {
-    int index = hash(key);
-    table[index].push_back({key, value});
-  }
-
-  // アイテムの削除
-  void operator-=(const std::string& key) {
-    int index = hash(key);
-    auto& items = table[index];
-    for (auto it = items.begin(); it != items.end(); ++it) {
-      if (it->first == key) {
-        items.erase(it);
-        break;
-      }
-    }
+    return hash % HASHSIZE;
   }
 };
 
-int main() {
-    HashTable<int> table;
+struct MyEqual
+{
+  bool operator()(const std::string &lhs, const std::string &rhs) const
+  {
+    return lhs == rhs;
+  }
+};
 
-    // 挿入
-    table.insert("hoge", 10);
-    table.insert("foo", 20);
-    table.insert("bar", 30);
+template <typename T>
+class HashTable
+{
+private:
+  std::unordered_map<std::string, T, MyHash, MyEqual> table;
 
-    // 探索
-    std::cout << "hoge: " << table("hoge") << std::endl;
-    std::cout << "foo: " << table("foo") << std::endl;
-    std::cout << "baz: " << table("baz") << std::endl;
+public:
+  // キーによる探索
+  T operator()(const std::string &key) const;
+  // アイテムの挿入
+  void insert(const std::string &key, const T &value);
+  // 削除
+  void operator-=(const std::string &key);
+};
 
-    // 削除
-    table -= "foo";
-    std::cout << "foo: " << table("foo") << std::endl;
+// 各メソッドを実装
+template <typename T>
+T HashTable<T>::operator()(const std::string &key) const
+{
+  auto it = table.find(key);
+  if (it != table.end())
+  {
+    return it->second;
+  }
+  else
+  {
+    throw std::runtime_error("Key not found");
+  }
+}
 
-    return 0;
+template <typename T>
+void HashTable<T>::insert(const std::string &key, const T &value)
+{
+  table[key] = value;
+}
+
+template <typename T>
+void HashTable<T>::operator-=(const std::string &key)
+{
+  table.erase(key);
+}
+
+int main()
+{
+  HashTable<int> table;
+
+  // 挿入
+  table.insert("hoge", 42);
+  table.insert("foo", 100);
+
+  // 探索
+  try
+  {
+    printf("hoge: %d\n", table("hoge"));
+    printf("foo: %d\n", table("foo"));
+  }
+  catch (const std::runtime_error &e)
+  {
+    std::cerr << e.what() << std::endl;
+  }
+
+  // 削除
+  table -= "hoge";
+
+  // 削除後の探索
+  try
+  {
+    printf("hoge: %d\n", table("hoge"));
+  }
+  catch (const std::runtime_error &e)
+  {
+    std::cerr << e.what() << std::endl;
+  }
+
+  HashTable<std::string> table2;
+  table2.insert("hoge", "fuga");
+  table2.insert("foo", "bar");
+
+  try
+  {
+    printf("hoge: %s\n", table2("hoge").c_str());
+    printf("foo: %s\n", table2("foo").c_str());
+  }
+  catch (const std::runtime_error &e)
+  {
+    std::cerr << e.what() << std::endl;
+  }
+
+  table2 -= "hoge";
+
+  try
+  {
+    printf("hoge: %s\n", table2("hoge").c_str());
+  }
+  catch (const std::runtime_error &e)
+  {
+    std::cerr << e.what() << std::endl;
+  }
+
+  return 0;
 }
