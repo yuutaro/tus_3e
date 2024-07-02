@@ -5,6 +5,8 @@ import java.io.PrintWriter;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.ObjectOutputStream;
+import java.io.ObjectInputStream;
 
 public class AIClient {
   final static int BLACK = 1;
@@ -14,9 +16,10 @@ public class AIClient {
   private PrintWriter out;
   private BufferedReader in;
 
+  private Process pythonProcess;
   private Socket aiSocket;
-  private PrintWriter aiOut;
-  private BufferedReader aiIn;
+  private ObjectOutputStream aiOut;
+  private ObjectInputStream aiIn;
 
   private int myColor;
   private int currentTurn;
@@ -31,13 +34,25 @@ public class AIClient {
       out = new PrintWriter(socket.getOutputStream(), true);
       in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
       out.println("NICK 6322087_Mikasa");
-
-      // 次の手を計算するサーバーとの通信用ソケットとIO
-      aiSocket = new Socket("localhost", 12345);
-      aiOut = new PrintWriter(aiSocket.getOutputStream(), true);
-      aiIn = new BufferedReader(new InputStreamReader(aiSocket.getInputStream()));
     } catch (Exception e) {
-      System.out.println("サーバーに接続できませんでした。");
+      System.out.println("オセロサーバーに接続できませんでした。");
+      System.exit(1);
+    }
+
+    try {
+      ProcessBuilder pb = new ProcessBuilder("python3", "probabbility_of_next_move.py");
+      pythonProcess = pb.start();
+    } catch (Exception e) {
+      System.out.println("Pythonプロセスを起動できませんでした。");
+      System.exit(1);
+    }
+
+    try {
+      aiSocket = new Socket("localhost", 65432);
+      aiOut = new ObjectOutputStream(aiSocket.getOutputStream());
+      aiIn = new ObjectInputStream(aiSocket.getInputStream());
+    } catch (Exception e) {
+      System.out.println("AIサーバーに接続できませんでした。");
       System.exit(1);
     }
 
@@ -92,12 +107,19 @@ public class AIClient {
         currentTurn = turn;
         System.out.println("現在のターン: " + (currentTurn == BLACK ? "BLACK" : "WHITE") + "\n");
 
-        // 自動で石を置く処理を仮置き
+        // 自動で石を置く処理
         if (currentTurn == myColor) {
-          int[] pos = randomPut(board, myColor);
-          out.println("PUT " + pos[0] + " " + pos[1]);
+          try {
+            int[] pos = getMoveFromAI(board);
+            if (pos != null) {
+              out.println("PUT " + pos[0] + " " + pos[1]);
+            } else {
+              System.out.println("No valid move available.");
+            }
+          } catch (Exception e) {
+            e.printStackTrace();
+          }
         }
-
         break;
 
       case "SAY":
@@ -126,7 +148,7 @@ public class AIClient {
         break;
 
       case "NICK":
-        nickname = message.substring(5);
+        String nickname = message.substring(5);
         System.out.println("ニックネームが" + nickname + "に設定されました。\n");
         break;
 
@@ -145,95 +167,125 @@ public class AIClient {
     }
   }
 
-  // 石が置けるかどうかを判定する関数
-  private boolean isValidMove(int[][] board, int x, int y, int color) {
-    // すでに石が置かれている場所には置けない
-    if (board[x][y] != 0) {
-      return false;
-    }
+  // Pythonサーバーにボードの状態を送信して次の手の確率を受信
+  private int[] getMoveFromAI(int[][] board) throws IOException, ClassNotFoundException {
+    aiOut.writeObject(board);
+    aiOut.flush();
 
-    int opponent = -color;
-
-    // 8方向をチェック
-    int[][] directions = { { -1, -1 }, { -1, 0 }, { -1, 1 }, { 0, -1 }, { 0, 1 }, { 1, -1 }, { 1, 0 }, { 1, 1 } };
-
-    for (int[] dir : directions) {
-      int dx = dir[0];
-      int dy = dir[1];
-      int nx = x + dx;
-      int ny = y + dy;
-
-      // 隣が相手の石かチェック
-      if (nx >= 0 && nx < 8 && ny >= 0 && ny < 8 && board[nx][ny] == opponent) {
-        nx += dx;
-        ny += dy;
-        // その方向にさらに進む
-        while (nx >= 0 && nx < 8 && ny >= 0 && ny < 8) {
-          if (board[nx][ny] == color) {
-            // 自分の石で挟めていればtrue
-            return true;
-          } else if (board[nx][ny] == 0) {
-            // 空白マスに到達したらこの方向は無効
-            break;
-          }
-          nx += dx;
-          ny += dy;
-        }
-      }
-    }
-
-    // どの方向でも挟めなかった
-    return false;
-  }
-
-  // 全マスをチェックして置ける場所を二次元配列で返す関数
-  private int[][] getValidMoves(int[][] board, int color) {
-    int[][] validMoves = new int[8][8];
+    double[][] probabilities = (double[][]) aiIn.readObject();
+    System.out.println("Received probabilities from AI server:");
 
     for (int i = 0; i < 8; i++) {
       for (int j = 0; j < 8; j++) {
-        if (isValidMove(board, i, j, color)) {
-          validMoves[i][j] = 1;
-        }
-      }
-    }
-
-    return validMoves;
-  }
-
-  // とりあえずランダムに石を置く関数
-  private int[] randomPut(int[][] board, int color) {
-    int[][] validMoves = getValidMoves(board, color);
-    ArrayList<int[]> movesList = new ArrayList<>();
-
-    // デバッグ用の表示と有効な手のリスト作成
-    System.out.println("置ける位置:");
-    for (int i = 0; i < 8; i++) {
-      for (int j = 0; j < 8; j++) {
-        System.out.print(validMoves[i][j] + " ");
-        if (validMoves[i][j] == 1) {
-          movesList.add(new int[] { i, j });
-        }
+        System.out.print(String.format("%.2f ", probabilities[i][j]));
       }
       System.out.println();
     }
-    System.out.println();
 
-    // 有効な手がない場合
-    if (movesList.isEmpty()) {
-      System.out.println("置ける位置がありません。");
-      return null;
+    // 確率の高い場所を選択
+    int[] bestMove = null;
+    double bestProbability = -1;
+    for (int i = 0; i < 8; i++) {
+      for (int j = 0; j < 8; j++) {
+        if (probabilities[i][j] > bestProbability) {
+          bestProbability = probabilities[i][j];
+          bestMove = new int[]{i, j};
+        }
+      }
     }
 
-    // ランダムに選択
-    Random random = new Random();
-    int randomIndex = random.nextInt(movesList.size());
-    int[] selectedMove = movesList.get(randomIndex);
-
-    System.out.println("選択された位置: (" + selectedMove[0] + ", " + selectedMove[1] + ")");
-
-    return selectedMove;
+    return bestMove;
   }
+
+    // 石が置けるかどうかを判定する関数
+    private boolean isValidMove(int[][] board, int x, int y, int color) {
+      // すでに石が置かれている場所には置けない
+      if (board[x][y] != 0) {
+        return false;
+      }
+  
+      int opponent = -color;
+  
+      // 8方向をチェック
+      int[][] directions = { { -1, -1 }, { -1, 0 }, { -1, 1 }, { 0, -1 }, { 0, 1 }, { 1, -1 }, { 1, 0 }, { 1, 1 } };
+  
+      for (int[] dir : directions) {
+        int dx = dir[0];
+        int dy = dir[1];
+        int nx = x + dx;
+        int ny = y + dy;
+  
+        // 隣が相手の石かチェック
+        if (nx >= 0 && nx < 8 && ny >= 0 && ny < 8 && board[nx][ny] == opponent) {
+          nx += dx;
+          ny += dy;
+          // その方向にさらに進む
+          while (nx >= 0 && nx < 8 && ny >= 0 && ny < 8) {
+            if (board[nx][ny] == color) {
+              // 自分の石で挟めていればtrue
+              return true;
+            } else if (board[nx][ny] == 0) {
+              // 空白マスに到達したらこの方向は無効
+              break;
+            }
+            nx += dx;
+            ny += dy;
+          }
+        }
+      }
+  
+      // どの方向でも挟めなかった
+      return false;
+    }
+  
+    // 全マスをチェックして置ける場所を二次元配列で返す関数
+    private int[][] getValidMoves(int[][] board, int color) {
+      int[][] validMoves = new int[8][8];
+  
+      for (int i = 0; i < 8; i++) {
+        for (int j = 0; j < 8; j++) {
+          if (isValidMove(board, i, j, color)) {
+            validMoves[i][j] = 1;
+          }
+        }
+      }
+  
+      return validMoves;
+    }
+  
+    // とりあえずランダムに石を置く関数
+    private int[] randomPut(int[][] board, int color) {
+      int[][] validMoves = getValidMoves(board, color);
+      ArrayList<int[]> movesList = new ArrayList<>();
+  
+      // デバッグ用の表示と有効な手のリスト作成
+      System.out.println("置ける位置:");
+      for (int i = 0; i < 8; i++) {
+        for (int j = 0; j < 8; j++) {
+          System.out.print(validMoves[i][j] + " ");
+          if (validMoves[i][j] == 1) {
+            movesList.add(new int[] { i, j });
+          }
+        }
+        System.out.println();
+      }
+      System.out.println();
+  
+      // 有効な手がない場合
+      if (movesList.isEmpty()) {
+        System.out.println("置ける位置がありません。");
+        return null;
+      }
+  
+      // ランダムに選択
+      Random random = new Random();
+      int randomIndex = random.nextInt(movesList.size());
+      int[] selectedMove = movesList.get(randomIndex);
+  
+      System.out.println("選択された位置: (" + selectedMove[0] + ", " + selectedMove[1] + ")");
+  
+      return selectedMove;
+    }
 
   public static void main(String args[]) {
     if (args.length != 2) {
