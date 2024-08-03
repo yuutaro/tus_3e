@@ -16,10 +16,10 @@ public class AIClient {
   private PrintWriter out;
   private BufferedReader in;
 
-  private Process pythonProcess;
-  private Socket aiSocket;
-  private ObjectOutputStream aiOut;
-  private ObjectInputStream aiIn;
+  public Process pythonProcess;
+  public Socket aiSocket;
+  public ObjectOutputStream aiOut;
+  public ObjectInputStream aiIn;
 
   private int myColor;
   private int currentTurn;
@@ -42,21 +42,41 @@ public class AIClient {
     try {
       ProcessBuilder pb = new ProcessBuilder("python3", "probabbility_of_next_move.py");
       pythonProcess = pb.start();
+      System.out.println("Pythonプロセスを起動しました。");
+      
+      // Pythonプロセスの標準出力と標準エラー出力を読み取るスレッドを開始
+      new Thread(() -> {
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(pythonProcess.getInputStream()))) {
+          String line;
+          while ((line = reader.readLine()) != null) {
+            System.out.println("Python output: " + line);
+            if (line.contains("Server started")) {
+              connectToAIServer();
+            }
+          }
+        } catch (IOException e) {
+          e.printStackTrace();
+        }
+      }).start();
+  
+      new Thread(() -> {
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(pythonProcess.getErrorStream()))) {
+          String line;
+          while ((line = reader.readLine()) != null) {
+            System.err.println("Python error: " + line);
+          }
+        } catch (IOException e) {
+          e.printStackTrace();
+        }
+      }).start();
+  
     } catch (Exception e) {
       System.out.println("Pythonプロセスを起動できませんでした。");
+      e.printStackTrace();
       System.exit(1);
     }
-
-    try {
-      aiSocket = new Socket("localhost", 65432);
-      aiOut = new ObjectOutputStream(aiSocket.getOutputStream());
-      aiIn = new ObjectInputStream(aiSocket.getInputStream());
-    } catch (Exception e) {
-      System.out.println("AIサーバーに接続できませんでした。");
-      System.exit(1);
-    }
-
-    // サーバーからのオセロ対戦通信受信部分追加
+  
+  // サーバーからのオセロ対戦通信受信部分追加
     new Thread(new Runnable() {
       public void run() {
         try {
@@ -69,6 +89,30 @@ public class AIClient {
         }
       }
     }).start();
+  }
+  
+  private void connectToAIServer() {
+    int maxRetries = 5;
+    int retryDelay = 2000; // 2秒
+  
+    for (int i = 0; i < maxRetries; i++) {
+      try {
+        aiSocket = new Socket("localhost", 30001);
+        aiOut = new ObjectOutputStream(aiSocket.getOutputStream());
+        aiIn = new ObjectInputStream(aiSocket.getInputStream());
+        System.out.println("AIサーバーに接続しました。");
+        return;
+      } catch (Exception e) {
+        System.out.println("AIサーバーへの接続に失敗しました。リトライ中... (" + (i + 1) + "/" + maxRetries + ")");
+        try {
+          Thread.sleep(retryDelay);
+        } catch (InterruptedException ie) {
+          Thread.currentThread().interrupt();
+        }
+      }
+    }
+    System.out.println("AIサーバーに接続できませんでした。");
+    System.exit(1);
   }
 
   private void handleServerMessage(String message) {
@@ -253,40 +297,6 @@ public class AIClient {
       return validMoves;
     }
   
-    // とりあえずランダムに石を置く関数
-    private int[] randomPut(int[][] board, int color) {
-      int[][] validMoves = getValidMoves(board, color);
-      ArrayList<int[]> movesList = new ArrayList<>();
-  
-      // デバッグ用の表示と有効な手のリスト作成
-      System.out.println("置ける位置:");
-      for (int i = 0; i < 8; i++) {
-        for (int j = 0; j < 8; j++) {
-          System.out.print(validMoves[i][j] + " ");
-          if (validMoves[i][j] == 1) {
-            movesList.add(new int[] { i, j });
-          }
-        }
-        System.out.println();
-      }
-      System.out.println();
-  
-      // 有効な手がない場合
-      if (movesList.isEmpty()) {
-        System.out.println("置ける位置がありません。");
-        return null;
-      }
-  
-      // ランダムに選択
-      Random random = new Random();
-      int randomIndex = random.nextInt(movesList.size());
-      int[] selectedMove = movesList.get(randomIndex);
-  
-      System.out.println("選択された位置: (" + selectedMove[0] + ", " + selectedMove[1] + ")");
-  
-      return selectedMove;
-    }
-
   public static void main(String args[]) {
     if (args.length != 2) {
       System.out.println("Usage: java AIClient <server address> <server port>");

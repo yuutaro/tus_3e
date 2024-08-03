@@ -242,5 +242,5 @@ model.compile(
 try:
     model.fit(x_train, y_train_reshape, epochs=600, batch_size=32, validation_split=0.2)
 except KeyboardInterrupt:
-    model.save('/workspace/model/model.h5')
+    model.export('/workspace/mymodel1')
     print('Output saved')
